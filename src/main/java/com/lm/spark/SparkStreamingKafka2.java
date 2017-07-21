@@ -33,18 +33,19 @@ import org.springframework.stereotype.Component;
 import com.lm.exception.MessageException;
 import com.lm.kafkahbase.HBaseUtils;
 import com.lm.kafkahbase.OffsetHBaseUtils;
+import com.lm.kafkahbase.OggKafkaJsonUtils;
 import com.lm.kafkahbase.OggKafkaUtils;
 import com.lm.utils.BeanUtil;
 
 @Component
-public class SparkStreamingKafka implements Serializable {
+public class SparkStreamingKafka2 implements Serializable {
 
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
 
-	public static Logger LOGGER = LoggerFactory.getLogger(SparkStreamingKafka.class);
+	public static Logger LOGGER = LoggerFactory.getLogger(SparkStreamingKafka2.class);
 
 	@Value("${spark.appname}")
 	private String appName;
@@ -69,7 +70,11 @@ public class SparkStreamingKafka implements Serializable {
 		SparkConf conf = new SparkConf().setAppName(appName).setMaster(master);
 		conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
 		conf.set("spark.kryo.registrator", "com.lm.kryo.MyRegistrator");
-
+		conf.set("spark.kryoserializer.buffer.mb", "256");
+		conf.set("spark.kryoserializer.buffer.max", "512");
+		
+		conf.set("spark.executor.memory", "4g");
+		
 		// 2.根据sparkconf 创建JavaStreamingContext
 		JavaStreamingContext jsc = new JavaStreamingContext(conf, Durations.seconds(second));
 
@@ -125,6 +130,7 @@ public class SparkStreamingKafka implements Serializable {
 
 			@Override
 			public void call(JavaRDD<ConsumerRecord<String, String>> v1, Time v2) {
+				
 				OffsetRange[] offsetRanges = ((HasOffsetRanges) v1.rdd()).offsetRanges();
 				for (OffsetRange offsetRange : offsetRanges) {
 					// begin your transaction
@@ -137,8 +143,7 @@ public class SparkStreamingKafka implements Serializable {
 					for (ConsumerRecord<String, String> record : consumerRecords) {
 						oggValues.add(record.value());
 					}
-//					OggKafkaUtils.processBatchPut(oggValues);
-					System.out.println(oggValues.toString());
+					OggKafkaJsonUtils.processBatchPut(oggValues);
 					long endDate = new Date().getTime();
 					System.out.println("插入完成:" + (endDate - startDate));
 
